@@ -1,0 +1,430 @@
+# XenClassify: AI-First Sound Classification Library
+
+> Working name — placeholder. Other options: XenSense, SonixClassify, AudioTag.
+
+## Vision
+
+A standalone, open-source Python library for sound classification and acoustic
+intelligence that works **out of the box** (one line to classify with a sensible
+default model) yet scales to custom training, real-time streaming, and edge
+deployment.
+
+It is a **separate package** from AIAudio:
+
+* Usable on its own: `pip install xenclassify`
+* Optionally consumed by AIAudio as the engine behind `audio.classify()`,
+  `audio.detect_events()`, and embedding-based search.
+
+## Design Principles
+
+* **Out of the box:** `Classifier.load()` with no args picks a good default,
+  lazily downloads weights, and just works.
+* **Backend-agnostic:** PyTorch for training; ONNX for fast/edge inference.
+* **One result object:** every prediction returns a rich, inspectable result
+  (top-k, scores, timeline, embeddings) — not a raw tensor.
+* **Library + CLI + (later) GUI** share one code path.
+* **Lean core, optional extras:** `pip install xenclassify[clap]`,
+  `[train]`, `[stream]`, `[onnx]`, `[domains]`.
+
+## What "Sound Classification" Covers Here
+
+* Multi-label audio tagging (AudioSet ontology, 527 classes)
+* Zero-shot classification from text labels (CLAP)
+* Sound Event Detection (SED) — frame-level "what happened when"
+* Acoustic scene classification (where it was recorded)
+* Single-label tasks: genre, instrument, emotion, gender/age, language
+* Anomaly / novelty detection (unsupervised)
+
+---
+
+# Phase 1: Core Inference Engine + Model Zoo
+
+## Goal
+
+Load a pretrained model and classify a file in one line, with a clean result API.
+
+### Predict
+
+```python
+from xenclassify import Classifier
+
+clf = Classifier.load("panns-cnn14")   # default if no name given
+result = clf.predict("dog.wav")
+
+result.top(5)          # [(label, score), ...]
+result.label           # single best label
+result.scores          # {label: score, ...}
+result.as_dict()
+```
+
+### Batch
+
+```python
+results = clf.predict(["a.wav", "b.wav", "c.wav"])
+```
+
+### Model Zoo (lazy download + cache)
+
+* PANNs (CNN14)  — strong AudioSet tagging baseline
+* YAMNet         — lightweight, fast, mobile-friendly
+* AST            — Audio Spectrogram Transformer (high accuracy)
+* BEATs / PaSST  — state-of-the-art transformers (optional extra)
+
+### Technology Stack
+
+* torch, torchaudio
+* numpy
+* huggingface_hub (weight hosting/download)
+
+### Deliverable
+
+```python
+from xenclassify import Classifier
+print(Classifier.load().predict("siren.wav").top(3))
+```
+
+---
+
+# Phase 2: Zero-Shot Classification (CLAP)  ★ differentiator
+
+## Goal
+
+Classify audio into **arbitrary, user-defined labels** with no training, by
+matching audio embeddings against text-prompt embeddings.
+
+### Example
+
+```python
+from xenclassify import ZeroShotClassifier
+
+zs = ZeroShotClassifier.load("clap")
+zs.classify("clip.wav", labels=["dog barking", "car horn", "rain", "music"])
+# -> [("rain", 0.81), ("music", 0.10), ...]
+```
+
+### Why it matters
+
+* No dataset, no fine-tuning — instant custom taxonomies.
+* Prompt engineering for labels ("a recording of {label}").
+* Foundation for AIAudio's flexible `audio.classify(labels=[...])`.
+
+### Technology Stack
+
+* CLAP (LAION / MS-CLAP)
+* transformers
+
+---
+
+# Phase 3: Sound Event Detection (Timeline)
+
+## Goal
+
+Move from "what is in the clip" to "what happened, and when."
+
+### Example
+
+```python
+events = clf.detect_events("street.wav", hop=0.5)
+# [{"label": "siren", "start": 3.0, "end": 6.5, "score": 0.92}, ...]
+```
+
+### Features
+
+* Sliding-window / frame-level inference
+* Per-event onset/offset with confidence
+* Smoothing + threshold tuning to merge fragments
+* Export timeline to JSON / CSV / subtitle-like format
+
+### Technology Stack
+
+* numpy, scipy.signal (windowing, smoothing)
+
+---
+
+# Phase 4: Embeddings & Similarity
+
+## Goal
+
+Expose the model's penultimate layer as reusable audio embeddings.
+
+### Example
+
+```python
+emb = clf.embed("audio.wav")              # np.ndarray
+sims = clf.find_similar("query.wav", corpus="./sounds/", top_k=5)
+```
+
+### Use Cases
+
+* Clustering large sound libraries
+* Duplicate / near-duplicate detection
+* Powers AIAudio Phase 6 (audio search & embeddings)
+* Few-shot classification via nearest-neighbor on embeddings
+
+### Technology Stack
+
+* numpy
+* optional: faiss / hnswlib for fast search
+
+---
+
+# Phase 5: Features, Datasets & Augmentation
+
+## Goal
+
+The building blocks for training and reproducible experiments.
+
+### Feature Extraction
+
+```python
+from xenclassify.features import logmel, mfcc, spectrogram
+X = logmel("audio.wav", n_mels=64)
+```
+
+### Dataset Loaders
+
+* ESC-50, UrbanSound8K, AudioSet, DCASE
+* Generic folder-per-class loader + CSV manifest loader
+
+```python
+from xenclassify.datasets import ESC50, FolderDataset
+ds = ESC50(download=True)
+```
+
+### Augmentation
+
+* Time stretch, pitch shift, gain, add-noise, time/freq masking (SpecAugment),
+  mixup
+* Composable pipeline
+
+### Technology Stack
+
+* torchaudio, librosa (optional), numpy
+
+---
+
+# Phase 6: Training & Fine-Tuning
+
+## Goal
+
+Transfer-learn on custom labels in a few lines.
+
+### Example
+
+```python
+from xenclassify import Trainer
+from xenclassify.datasets import FolderDataset
+
+trainer = Trainer(base_model="ast", dataset=FolderDataset("./my_sounds"))
+model = trainer.fit(epochs=10)
+model.save("my_classifier")
+
+Classifier.load("my_classifier").predict("test.wav")
+```
+
+### Features
+
+* Freeze backbone / fine-tune head, or full fine-tune
+* Class imbalance handling, label smoothing
+* Checkpointing, early stopping, mixed precision
+* Logging hooks (TensorBoard / Weights & Biases optional)
+
+### Technology Stack
+
+* torch, torchmetrics
+* optional: lightning
+
+---
+
+# Phase 7: Evaluation & Explainability
+
+## Goal
+
+Trust and debug predictions.
+
+### Metrics
+
+```python
+report = clf.evaluate(test_dataset)
+report.mAP, report.f1, report.accuracy, report.confusion_matrix()
+```
+
+### Explainability
+
+* Grad-CAM / saliency over the mel-spectrogram (which time-frequency region
+  drove the prediction)
+* Per-class threshold calibration
+
+```python
+clf.explain("audio.wav", label="dog")   # returns heatmap overlay
+```
+
+### Technology Stack
+
+* scikit-learn, matplotlib
+* captum (optional)
+
+---
+
+# Phase 8: Domain Packs
+
+## Goal
+
+Ship ready-to-use specialized classifiers as optional plugins.
+
+### Packs
+
+* **Bioacoustics** — bird / animal species (BirdNET-style)
+* **Industrial** — machine fault / anomaly detection
+* **Security** — gunshot, scream, glass break, alarm
+* **Health** — cough, snore, baby cry, wheeze
+* **Music** — genre, instrument, mood
+* **Speech** — emotion (SER), gender, age, language ID
+
+```python
+from xenclassify.domains import security
+security.detect("cctv_audio.wav")   # ["glass_break", "alarm"]
+```
+
+---
+
+# Phase 9: Streaming / Real-Time
+
+## Goal
+
+Classify live audio from a microphone or stream.
+
+### Example
+
+```python
+from xenclassify import StreamClassifier
+
+with StreamClassifier.load("yamnet") as s:
+    for event in s.listen():        # rolling-window inference
+        print(event.label, event.score)
+```
+
+### Features
+
+* Rolling buffer, configurable window/hop
+* Low-latency lightweight models (YAMNet)
+* Callbacks / generator API
+* Optional WebSocket server for browser clients
+
+### Technology Stack
+
+* sounddevice / pyaudio
+* websockets (optional)
+
+---
+
+# Phase 10: Deployment & Edge Export
+
+## Goal
+
+Run anywhere — server, browser, mobile, microcontroller-class devices.
+
+### Features
+
+* Export to ONNX / TFLite
+* Quantization (int8) for edge
+* Tiny REST/gRPC serving wrapper
+* Pure-ONNX inference path (no torch at runtime)
+
+```python
+clf.export("model.onnx", quantize=True)
+```
+
+### Technology Stack
+
+* onnx, onnxruntime
+* optional: tflite, openvino
+
+---
+
+# Phase 11: AIAudio Integration + Plugin API
+
+## Goal
+
+Make XenClassify the brain behind AIAudio's classification, and let third
+parties register custom classifiers.
+
+### AIAudio side
+
+```python
+from aiaudio import Audio
+
+audio = Audio.load("meeting.mp3")
+audio.classify()                                 # multi-label tags
+audio.classify(labels=["applause", "laughter"])  # zero-shot
+audio.detect_events()                            # timeline
+audio.embed()                                    # embeddings
+```
+
+### Plugin registration
+
+```python
+from xenclassify import register_model
+
+@register_model("my-custom-net")
+class MyNet:
+    ...
+```
+
+---
+
+# Potential Project Structure
+
+```text
+xenclassify/
+│
+├── core/
+│   ├── classifier.py        # Classifier, predict, batch
+│   ├── result.py            # PredictionResult, EventTimeline
+│   └── registry.py          # model zoo + plugin registration
+│
+├── models/
+│   ├── panns.py
+│   ├── yamnet.py
+│   ├── ast.py
+│   └── clap.py              # zero-shot
+│
+├── features/                # logmel, mfcc, spectrogram
+├── datasets/                # ESC50, UrbanSound8K, AudioSet, loaders
+├── augment/                 # SpecAugment, mixup, etc.
+├── train/                   # Trainer, callbacks, metrics
+├── eval/                    # metrics, explainability
+├── streaming/               # real-time
+├── export/                  # onnx / tflite
+├── domains/                 # bioacoustics, security, health, music...
+├── cli/                     # `xenclassify predict ...`
+└── utils/
+```
+
+---
+
+# Suggested Build Order (MVP-first)
+
+1. **Phase 1** — core engine + 1–2 pretrained models (PANNs + YAMNet). Shippable.
+2. **Phase 2** — CLAP zero-shot. This is the headline feature; ship early.
+3. **Phase 4** — embeddings (cheap once models are loaded; unlocks AIAudio search).
+4. **Phase 3** — event detection timeline.
+5. **Phase 5 + 6** — datasets/augmentation, then training (turns it into a platform).
+6. **Phase 7** — evaluation + explainability (credibility).
+7. **Phases 8–11** — domain packs, streaming, edge export, AIAudio integration.
+
+---
+
+# Long-Term Goal
+
+Become the **classification + acoustic-intelligence** counterpart to:
+
+* YAMNet / PANNs (tagging)
+* CLAP (zero-shot)
+* BirdNET (domain specialists)
+
+…behind one clean API, usable standalone or as AIAudio's intelligence layer.
+
+## Tagline
+
+**"XenClassify — Teach Machines to Listen."**
