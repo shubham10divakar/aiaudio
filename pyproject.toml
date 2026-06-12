@@ -1,17 +1,40 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "aiaudio"
 version = "1.0.0"
 description = "Audio Processing Meets Audio Intelligence."
+readme = "README.md"
 requires-python = ">=3.9"
-license = { text = "MIT" }
+license = "MIT"
+authors = [
+    { name = "Shubham Divakar", email = "shubham.divakar@gmail.com" }
+]
+keywords = ["audio", "speech", "ai", "transcription", "noise-removal", "ffmpeg"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Multimedia :: Sound/Audio",
+    "Topic :: Multimedia :: Sound/Audio :: Conversion",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+]
 dependencies = [
     "numpy>=1.24",
     "scipy>=1.10",
 ]
+
+[project.urls]
+Homepage = "https://github.com/shubham10divakar/aiaudio"
+Repository = "https://github.com/shubham10divakar/aiaudio"
+"Bug Tracker" = "https://github.com/shubham10divakar/aiaudio/issues"
 
 [project.optional-dependencies]
 formats = ["ffmpeg-python"]
@@ -21,6 +44,9 @@ dev     = ["pytest>=7.0", "pytest-cov"]
 
 [project.scripts]
 aiaudio = "aiaudio.cli.main:main"
+
+[tool.setuptools.packages.find]
+exclude = ["tests*", "build*", "dist*", "*.egg-info"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
