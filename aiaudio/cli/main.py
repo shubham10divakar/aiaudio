@@ -63,7 +63,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="aiaudio",
         description="AIAudio — Audio Processing Meets Audio Intelligence.",
     )
-    parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
+    parser.add_argument("--version", action="version", version="%(prog)s 1.0.0")
     sub = parser.add_subparsers(dest="command", metavar="<command>")
 
     # info

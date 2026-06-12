@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="aiaudio",
-    version="0.1.0",
+    version="1.0.0",
     description="Audio Processing Meets Audio Intelligence.",
     author="AIAudio Contributors",
     python_requires=">=3.9",

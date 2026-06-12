@@ -6,6 +6,10 @@
 
 An open-source Python library that starts as a lightweight audio toolkit and evolves into a full AI-powered audio intelligence platform — covering everything from format conversion to transcription, noise removal, speaker detection, and semantic search.
 
+[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](https://github.com/shubham10divakar/aiaudio/releases)
+[![PyPI](https://img.shields.io/pypi/v/aiaudio?style=flat-square&logo=pypi&label=PyPI&color=blue)](https://pypi.org/project/aiaudio)
+[![Downloads](https://img.shields.io/pypi/dm/aiaudio?style=flat-square&label=downloads%2Fmonth&color=brightgreen)](https://pypi.org/project/aiaudio)
+[![Total Downloads](https://img.shields.io/pepy/dt/aiaudio?style=flat-square&label=total%20downloads&color=green)](https://pypi.org/project/aiaudio)
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue?style=flat-square&logo=python)](https://python.org)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-48%20passing-brightgreen?style=flat-square)](#running-tests)
