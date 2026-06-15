@@ -49,6 +49,19 @@ def cmd_convert(args: argparse.Namespace) -> None:
     print(f"Saved: {args.output}")
 
 
+def cmd_gui(args: argparse.Namespace) -> None:
+    try:
+        from aiaudio.gui.converter import launch
+    except ImportError:
+        print(
+            "Error: Gradio is not installed. Install the GUI extra:\n"
+            "  pip install aiaudio[gui]",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+    launch(server_port=args.port, share=args.share)
+
+
 def cmd_concat(args: argparse.Namespace) -> None:
     audios = [Audio.load(f) for f in args.files]
     result = audios[0]
@@ -88,6 +101,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("files", nargs="+", help="Input audio files")
     p.add_argument("-o", "--output", required=True, help="Output file path")
 
+    # gui (requires gradio)
+    p = sub.add_parser("gui", help="Launch the browser-based format converter (requires gradio)")
+    p.add_argument("--port", type=int, default=None, metavar="PORT",
+                   help="Port to serve on (default: Gradio's choice)")
+    p.add_argument("--share", action="store_true",
+                   help="Create a public shareable link")
+
     # convert (requires FFmpeg)
     p = sub.add_parser("convert", help="Convert audio to a different format (requires FFmpeg)")
     p.add_argument("file", help="Input audio file")
@@ -114,6 +134,7 @@ def main() -> None:
         "volume": cmd_volume,
         "concat": cmd_concat,
         "convert": cmd_convert,
+        "gui": cmd_gui,
     }
     dispatch[args.command](args)
 

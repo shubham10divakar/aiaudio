@@ -1,8 +1,8 @@
 # AIAudio — Plan
 
 > **Tagline:** *"Audio Processing Meets Audio Intelligence."*
-> **Status:** Planning
-> **Last updated:** 2026-06-13
+> **Status:** Phases 1–2.5 shipped
+> **Last updated:** 2026-06-15
 
 ---
 
@@ -24,7 +24,7 @@ An open-source Python library that starts as a lightweight audio manipulation to
 | 1 | Core Audio Engine | Done |
 | 1.1 | CLI — Command Line Interface | Done |
 | 2 | Multi-Format Support | Done |
-| 2.5 | GUI — Audio Format Converter | Planned |
+| 2.5 | GUI — Audio Format Converter | Done |
 | 3 | Audio Effects | Planned |
 | 4 | AI Audio Enhancement | Planned |
 | 5 | Speech Intelligence | Planned |
@@ -242,46 +242,35 @@ All GUI options are thin orchestration layers — real work always delegates to 
 - **v1:** Gradio — fastest path, reuses same surface for all upcoming AI phases
 - **Later:** Tkinter + PyInstaller for users who want a standalone offline `.exe`
 
-### Gradio Implementation Sketch
+### As Built
+
+Implemented in `aiaudio/gui/converter.py`. The conversion logic is **pure Python
+with no Gradio dependency** (so it's unit-testable and reusable), and the Gradio
+layer is a thin wrapper with a lazy import:
 
 ```python
-import gradio as gr
-import zipfile, tempfile, os
-from aiaudio import Audio
+from aiaudio.gui.converter import convert_batch, build_app
 
-def convert(files, target_fmt, sample_rate, channels):
-    outputs = []
-    for f in files:
-        audio = Audio.load(f.name)
-        if sample_rate != "Keep original":
-            audio = audio.resample(int(sample_rate))
-        if channels != "Keep":
-            audio = audio.set_channels(1 if channels == "Mono" else 2)
-        out = os.path.splitext(f.name)[0] + "." + target_fmt
-        audio.export(out, format=target_fmt)
-        outputs.append(out)
+# Pure core — testable without Gradio or a browser:
+results = convert_batch(["a.wav", "b.flac"], "mp3", sample_rate=44100, channels=1)
+for r in results:
+    print(r.source, "->", r.output if r.ok else r.error)
 
-    if len(outputs) == 1:
-        return outputs[0]
-    zip_path = os.path.join(tempfile.gettempdir(), "converted.zip")
-    with zipfile.ZipFile(zip_path, "w") as z:
-        for o in outputs:
-            z.write(o, arcname=os.path.basename(o))
-    return zip_path
-
-with gr.Blocks(title="AIAudio — Format Converter") as app:
-    gr.Markdown("# AIAudio — Format Converter")
-    files  = gr.File(file_count="multiple", label="Drop audio files here")
-    target = gr.Dropdown(["wav","mp3","flac","ogg","aac","m4a"], value="mp3", label="Convert to")
-    sr     = gr.Dropdown(["Keep original","16000","44100","48000"], value="Keep original", label="Sample rate")
-    ch     = gr.Dropdown(["Keep","Mono","Stereo"], value="Keep", label="Channels")
-    btn    = gr.Button("Convert all", variant="primary")
-    result = gr.File(label="Download result")
-    btn.click(convert, [files, target, sr, ch], result)
-
-if __name__ == "__main__":
-    app.launch()
+# Gradio app:
+build_app().launch()
 ```
+
+Key points:
+- `convert_one(source, target_format, sample_rate=None, channels=None, out_dir=None)`
+  converts one file via `Audio.load → resample → set_channels → export`.
+  `export()` routes by file extension (no `format=` kwarg).
+- `convert_batch(...)` returns a `ConversionResult` per file; a failing file is
+  captured as `error` and never aborts the batch.
+- Single output → returned directly; multiple → bundled into a ZIP via `make_zip`.
+- Gradio is imported lazily inside `build_app()`, so `import aiaudio.gui.converter`
+  (and the pure core + its tests) work even when Gradio isn't installed.
+- Bitrate selection from the original sketch is deferred — the core `export()`
+  doesn't yet take an encoder bitrate; added when the exporter supports it.
 
 ### Engineering Notes
 
@@ -303,7 +292,10 @@ if __name__ == "__main__":
 ### Deliverable
 
 ```bash
+pip install aiaudio[gui]
+
 python -m aiaudio.gui    # opens converter in the browser
+aiaudio gui              # same, via the CLI (supports --port / --share)
 ```
 
 ---

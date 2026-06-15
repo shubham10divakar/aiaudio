@@ -93,7 +93,7 @@ audio.export_report("meeting_report.md")
 | 🔜 | Real-time streaming and live transcription | Phase 8 |
 | 🔜 | Plugin architecture | Phase 9 |
 | 🔜 | Agentic end-to-end audio pipelines | Phase 10 |
-| 🔜 | GUI — drag-and-drop format converter | Phase 2.5 |
+| ✅ | GUI — drag-and-drop format converter | Phase 2.5 |
 
 ---
 
@@ -450,6 +450,20 @@ aiaudio convert stereo.flac -o mono_16k.wav --sample-rate 16000 --channels 1
 aiaudio convert audiobook.m4a -o audiobook.ogg
 ```
 
+### `aiaudio gui`
+
+Launch the browser-based drag-and-drop format converter. Requires the GUI extra (`pip install "aiaudio[gui]"`); multi-format output still needs FFmpeg.
+
+```bash
+aiaudio gui                  # open the converter in your browser
+aiaudio gui --port 8080      # serve on a specific port
+aiaudio gui --share          # create a public shareable link
+
+python -m aiaudio.gui        # equivalent, without the CLI
+```
+
+Drop one or more files, pick a target format (plus optional sample rate / channels), and click **Convert all**. A single file downloads directly; a batch downloads as a ZIP. One bad file reports its error inline without aborting the rest of the batch.
+
 ---
 
 ## Roadmap
@@ -461,7 +475,7 @@ AIAudio is built in phases. Each phase is independently useful and ships as a wo
 | ✅ **1** | Core Audio Engine | Load, slice, concat, volume, export (WAV) |
 | ✅ **1.1** | CLI | `aiaudio` command with 5 subcommands |
 | ✅ **2** | Multi-Format Support | MP3, FLAC, OGG, AAC, M4A via FFmpeg |
-| 🔜 **2.5** | GUI | Drag-and-drop browser-based format converter |
+| ✅ **2.5** | GUI | Drag-and-drop browser-based format converter |
 | 🔜 **3** | Audio Effects | Fade in/out, speed change, reverse, normalize, silence removal |
 | 🔜 **4** | AI Enhancement | Noise removal, echo reduction, voice cleanup |
 | 🔜 **5** | Speech Intelligence | Transcription, language detection, speaker diarization |
@@ -577,16 +591,20 @@ aiaudio/
 ├── cli/
 │   └── main.py         # aiaudio CLI — argparse subcommands
 │
+├── gui/
+│   ├── converter.py    # Phase 2.5 — conversion core + Gradio app
+│   └── __main__.py     # python -m aiaudio.gui entry point
+│
 ├── effects/            # Phase 3 — fade, normalize, reverse, silence
 ├── ai/                 # Phases 4–7 — enhancer, whisper, diarization, LLM
-├── gui/                # Phase 2.5 — Gradio format converter
 ├── plugins/            # Phase 9 — plugin registry
 └── utils/
 
 tests/
 ├── test_core.py        # Phase 1 — 22 tests
 ├── test_cli.py         # Phase 1.1 — 9 tests
-└── test_phase2.py      # Phase 2 — 17 tests (8 skipped if FFmpeg absent)
+├── test_phase2.py      # Phase 2 — 17 tests (8 skipped if FFmpeg absent)
+└── test_gui.py         # Phase 2.5 — 16 tests (GUI conversion core)
 
 setup.py
 pyproject.toml
@@ -616,7 +634,7 @@ pip install "aiaudio[ai]"     # adds torch + whisper + more
 ```
 
 **One code path**
-The CLI and (future) GUI are thin orchestration layers. All logic lives in the `Audio` class. There is no special-casing for how a request arrived.
+The CLI and GUI are thin orchestration layers. All logic lives in the `Audio` class. There is no special-casing for how a request arrived.
 
 **Float32 internally**
 Samples are normalised to `[-1.0, 1.0]` on load regardless of source bit depth. All DSP math operates in float32. Conversion back to `int16` happens only on WAV export.
@@ -645,8 +663,8 @@ pytest tests/test_core.py tests/test_cli.py -v
 FFmpeg integration tests skip automatically if FFmpeg is not installed — they do not fail.
 
 ```
-48 passed, 8 skipped   ← skipped = FFmpeg not present
-56 passed, 0 skipped   ← when FFmpeg is installed
+64 passed, 8 skipped   ← skipped = FFmpeg not present
+72 passed, 0 skipped   ← when FFmpeg is installed
 ```
 
 ---
