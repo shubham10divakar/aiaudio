@@ -93,6 +93,42 @@ class Audio:
         return Audio(stereo, self._sample_rate)
 
     # ------------------------------------------------------------------
+    # Effects (Phase 3) — all return new Audio objects
+    # ------------------------------------------------------------------
+
+    def fade_in(self, duration_ms: float) -> Audio:
+        """Linear fade in over the first ``duration_ms`` milliseconds."""
+        from ..effects import fade
+        return Audio(fade.fade_in(self._samples, self._sample_rate, duration_ms), self._sample_rate)
+
+    def fade_out(self, duration_ms: float) -> Audio:
+        """Linear fade out over the last ``duration_ms`` milliseconds."""
+        from ..effects import fade
+        return Audio(fade.fade_out(self._samples, self._sample_rate, duration_ms), self._sample_rate)
+
+    def normalize(self, headroom_db: float = 0.0) -> Audio:
+        """Peak-normalize so the loudest sample sits at ``-headroom_db`` dBFS."""
+        from ..effects import normalize as _normalize
+        return Audio(_normalize.normalize(self._samples, headroom_db), self._sample_rate)
+
+    def reverse(self) -> Audio:
+        """Reverse the audio in time."""
+        return Audio(self._samples[::-1].copy(), self._sample_rate)
+
+    def speed(self, factor: float) -> Audio:
+        """Change tempo by ``factor`` while preserving pitch (1.5 = 1.5× faster)."""
+        from ..effects import timestretch
+        return Audio(timestretch.speed(self._samples, self._sample_rate, factor), self._sample_rate)
+
+    def remove_silence(self, threshold_db: float = -40.0, min_silence_ms: float = 100.0) -> Audio:
+        """Strip silent gaps longer than ``min_silence_ms`` (silence < ``threshold_db``)."""
+        from ..effects import silence
+        return Audio(
+            silence.remove_silence(self._samples, self._sample_rate, threshold_db, min_silence_ms),
+            self._sample_rate,
+        )
+
+    # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
 

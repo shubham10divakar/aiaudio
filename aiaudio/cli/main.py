@@ -49,6 +49,40 @@ def cmd_convert(args: argparse.Namespace) -> None:
     print(f"Saved: {args.output}")
 
 
+def cmd_fade(args: argparse.Namespace) -> None:
+    audio = Audio.load(args.file)
+    if args.in_ms:
+        audio = audio.fade_in(args.in_ms)
+    if args.out_ms:
+        audio = audio.fade_out(args.out_ms)
+    audio.export(args.output)
+    print(f"Saved: {args.output}")
+
+
+def cmd_normalize(args: argparse.Namespace) -> None:
+    audio = Audio.load(args.file).normalize(args.headroom)
+    audio.export(args.output)
+    print(f"Saved: {args.output}")
+
+
+def cmd_reverse(args: argparse.Namespace) -> None:
+    audio = Audio.load(args.file).reverse()
+    audio.export(args.output)
+    print(f"Saved: {args.output}")
+
+
+def cmd_speed(args: argparse.Namespace) -> None:
+    audio = Audio.load(args.file).speed(args.factor)
+    audio.export(args.output)
+    print(f"Saved: {args.output}")
+
+
+def cmd_silence(args: argparse.Namespace) -> None:
+    audio = Audio.load(args.file).remove_silence(args.threshold, args.min_silence)
+    audio.export(args.output)
+    print(f"Saved: {args.output}")
+
+
 def cmd_gui(args: argparse.Namespace) -> None:
     try:
         from aiaudio.gui.converter import launch
@@ -101,6 +135,42 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("files", nargs="+", help="Input audio files")
     p.add_argument("-o", "--output", required=True, help="Output file path")
 
+    # fade
+    p = sub.add_parser("fade", help="Apply fade in and/or fade out")
+    p.add_argument("file", help="Input audio file")
+    p.add_argument("--in", dest="in_ms", type=float, default=0, metavar="MS",
+                   help="Fade-in duration in milliseconds")
+    p.add_argument("--out", dest="out_ms", type=float, default=0, metavar="MS",
+                   help="Fade-out duration in milliseconds")
+    p.add_argument("-o", "--output", required=True, help="Output file path")
+
+    # normalize
+    p = sub.add_parser("normalize", help="Peak-normalize the audio")
+    p.add_argument("file", help="Input audio file")
+    p.add_argument("--headroom", type=float, default=0.0, metavar="DB",
+                   help="Headroom below full scale in dB (default: 0)")
+    p.add_argument("-o", "--output", required=True, help="Output file path")
+
+    # reverse
+    p = sub.add_parser("reverse", help="Reverse the audio in time")
+    p.add_argument("file", help="Input audio file")
+    p.add_argument("-o", "--output", required=True, help="Output file path")
+
+    # speed
+    p = sub.add_parser("speed", help="Change tempo (pitch preserved); 1.5 = 1.5x faster")
+    p.add_argument("file", help="Input audio file")
+    p.add_argument("factor", type=float, help="Speed factor (>1 faster, <1 slower)")
+    p.add_argument("-o", "--output", required=True, help="Output file path")
+
+    # silence
+    p = sub.add_parser("silence", help="Remove silent gaps")
+    p.add_argument("file", help="Input audio file")
+    p.add_argument("--threshold", type=float, default=-40.0, metavar="DB",
+                   help="Silence threshold in dBFS (default: -40)")
+    p.add_argument("--min-silence", dest="min_silence", type=float, default=100.0, metavar="MS",
+                   help="Minimum silence to remove, in ms (default: 100)")
+    p.add_argument("-o", "--output", required=True, help="Output file path")
+
     # gui (requires gradio)
     p = sub.add_parser("gui", help="Launch the browser-based format converter (requires gradio)")
     p.add_argument("--port", type=int, default=None, metavar="PORT",
@@ -134,6 +204,11 @@ def main() -> None:
         "volume": cmd_volume,
         "concat": cmd_concat,
         "convert": cmd_convert,
+        "fade": cmd_fade,
+        "normalize": cmd_normalize,
+        "reverse": cmd_reverse,
+        "speed": cmd_speed,
+        "silence": cmd_silence,
         "gui": cmd_gui,
     }
     dispatch[args.command](args)
