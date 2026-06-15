@@ -129,6 +129,22 @@ class Audio:
         )
 
     # ------------------------------------------------------------------
+    # AI enhancement (Phase 4) — all return new Audio objects
+    # ------------------------------------------------------------------
+
+    def remove_noise(self, backend: str = "spectral", **kwargs) -> Audio:
+        """Reduce background noise.
+
+        ``backend="spectral"`` (default) is dependency-free; ``"deepfilternet"``
+        uses a deep-learning model and needs the ``aiaudio[ai]`` extra.
+        """
+        from ..ai import enhancer
+        return Audio(
+            enhancer.reduce_noise(self._samples, self._sample_rate, backend, **kwargs),
+            self._sample_rate,
+        )
+
+    # ------------------------------------------------------------------
     # Export
     # ------------------------------------------------------------------
 
