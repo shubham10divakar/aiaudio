@@ -82,8 +82,8 @@ audio.export_report("meeting_report.md")
 | ✅ | Volume control (increase / decrease in dB) | **Available** |
 | ✅ | Resampling (change sample rate) | **Available** |
 | ✅ | Channel conversion (mono ↔ stereo) | **Available** |
-| ✅ | CLI — `aiaudio` command with 5 subcommands | **Available** |
-| 🔜 | Fade in / fade out / reverse / normalize / silence removal | Phase 3 |
+| ✅ | CLI — `aiaudio` command with subcommands | **Available** |
+| ✅ | Fade in / fade out / reverse / normalize / speed / silence removal | **Available** |
 | 🔜 | AI noise removal, echo reduction, audio cleanup | Phase 4 |
 | 🔜 | Speech-to-text transcription | Phase 5 |
 | 🔜 | Language detection | Phase 5 |
@@ -450,6 +450,28 @@ aiaudio convert stereo.flac -o mono_16k.wav --sample-rate 16000 --channels 1
 aiaudio convert audiobook.m4a -o audiobook.ogg
 ```
 
+### `aiaudio` effects — `fade` / `normalize` / `reverse` / `speed` / `silence`
+
+Audio effects (Phase 3). Each reads a file, applies the effect, and writes the result. Output format follows the output extension (non-WAV needs FFmpeg).
+
+```bash
+# Fade in 500 ms and fade out 800 ms
+aiaudio fade song.wav --in 500 --out 800 -o faded.wav
+
+# Peak-normalize (optionally leave 3 dB of headroom)
+aiaudio normalize quiet.wav -o loud.wav
+aiaudio normalize quiet.wav --headroom 3 -o loud.wav
+
+# Reverse
+aiaudio reverse song.wav -o backwards.wav
+
+# 1.5× faster, pitch preserved (use <1 to slow down)
+aiaudio speed lecture.mp3 1.5 -o quick.mp3
+
+# Remove silent gaps longer than 200 ms below -30 dBFS
+aiaudio silence interview.wav --threshold -30 --min-silence 200 -o tight.wav
+```
+
 ### `aiaudio gui`
 
 Launch the browser-based drag-and-drop format converter. Requires the GUI extra (`pip install "aiaudio[gui]"`); multi-format output still needs FFmpeg.
@@ -476,7 +498,7 @@ AIAudio is built in phases. Each phase is independently useful and ships as a wo
 | ✅ **1.1** | CLI | `aiaudio` command with 5 subcommands |
 | ✅ **2** | Multi-Format Support | MP3, FLAC, OGG, AAC, M4A via FFmpeg |
 | ✅ **2.5** | GUI | Drag-and-drop browser-based format converter |
-| 🔜 **3** | Audio Effects | Fade in/out, speed change, reverse, normalize, silence removal |
+| ✅ **3** | Audio Effects | Fade in/out, speed change, reverse, normalize, silence removal |
 | 🔜 **4** | AI Enhancement | Noise removal, echo reduction, voice cleanup |
 | 🔜 **5** | Speech Intelligence | Transcription, language detection, speaker diarization |
 | 🔜 **6** | Embeddings & Search | Semantic audio search — find content by meaning |
@@ -485,17 +507,25 @@ AIAudio is built in phases. Each phase is independently useful and ships as a wo
 | 🔜 **9** | Plugin Architecture | Custom effects, models, and exporters via `@plugin` decorator |
 | 🔜 **10** | Agentic Platform | Full pipeline: clean → transcribe → diarize → summarize → report |
 
-### Phase 3 preview — Audio Effects
+### Phase 3 — Audio Effects ✅
+
+Like every operation, effects return a **new** `Audio` (the original is untouched) and chain freely:
 
 ```python
 audio = Audio.load("recording.wav")
 
-audio.fade_in(2000)       # 2-second fade in
-audio.fade_out(3000)      # 3-second fade out
-audio.normalize()         # peak normalize to 0 dBFS
-audio.reverse()           # reverse the audio
-audio.speed(1.5)          # 1.5× speed (no pitch change)
-audio.remove_silence()    # strip silent gaps
+audio = (
+    audio
+    .normalize()              # peak-normalize to 0 dBFS (normalize(headroom_db=3) leaves 3 dB)
+    .fade_in(2000)            # 2-second fade in
+    .fade_out(3000)           # 3-second fade out
+    .remove_silence()         # strip silent gaps (threshold_db / min_silence_ms tunable)
+)
+
+faster   = audio.speed(1.5)   # 1.5× faster — pitch preserved (overlap-add time stretch)
+backward = audio.reverse()    # reverse in time
+
+audio.export("polished.wav")
 ```
 
 ### Phase 4 preview — AI Enhancement
@@ -595,7 +625,12 @@ aiaudio/
 │   ├── converter.py    # Phase 2.5 — conversion core + Gradio app
 │   └── __main__.py     # python -m aiaudio.gui entry point
 │
-├── effects/            # Phase 3 — fade, normalize, reverse, silence
+├── effects/
+│   ├── fade.py         # Phase 3 — fade in / out
+│   ├── normalize.py    # Phase 3 — peak normalization
+│   ├── silence.py      # Phase 3 — silence removal
+│   └── timestretch.py  # Phase 3 — speed (pitch-preserving)
+│
 ├── ai/                 # Phases 4–7 — enhancer, whisper, diarization, LLM
 ├── plugins/            # Phase 9 — plugin registry
 └── utils/
@@ -604,7 +639,8 @@ tests/
 ├── test_core.py        # Phase 1 — 22 tests
 ├── test_cli.py         # Phase 1.1 — 9 tests
 ├── test_phase2.py      # Phase 2 — 17 tests (8 skipped if FFmpeg absent)
-└── test_gui.py         # Phase 2.5 — 16 tests (GUI conversion core)
+├── test_gui.py         # Phase 2.5 — 16 tests (GUI conversion core)
+└── test_phase3.py      # Phase 3 — 31 tests (audio effects)
 
 setup.py
 pyproject.toml
@@ -663,8 +699,8 @@ pytest tests/test_core.py tests/test_cli.py -v
 FFmpeg integration tests skip automatically if FFmpeg is not installed — they do not fail.
 
 ```
-64 passed, 8 skipped   ← skipped = FFmpeg not present
-72 passed, 0 skipped   ← when FFmpeg is installed
+95 passed, 8 skipped   ← skipped = FFmpeg not present
+103 passed, 0 skipped   ← when FFmpeg is installed
 ```
 
 ---

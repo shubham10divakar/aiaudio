@@ -1,7 +1,7 @@
 # AIAudio — Plan
 
 > **Tagline:** *"Audio Processing Meets Audio Intelligence."*
-> **Status:** Phases 1–2.5 shipped
+> **Status:** Phases 1–3 shipped
 > **Last updated:** 2026-06-15
 
 ---
@@ -25,7 +25,7 @@ An open-source Python library that starts as a lightweight audio manipulation to
 | 1.1 | CLI — Command Line Interface | Done |
 | 2 | Multi-Format Support | Done |
 | 2.5 | GUI — Audio Format Converter | Done |
-| 3 | Audio Effects | Planned |
+| 3 | Audio Effects | Done |
 | 4 | AI Audio Enhancement | Planned |
 | 5 | Speech Intelligence | Planned |
 | 6 | Audio Search & Embeddings | Planned |
@@ -307,19 +307,34 @@ aiaudio gui              # same, via the CLI (supports --port / --share)
 ### API
 
 ```python
-audio.fade_in(1000)       # ms
-audio.fade_out(1000)
-audio.speed(1.5)
-audio.reverse()
-audio.normalize()
-audio.remove_silence()
+audio.fade_in(1000)       # ms — linear ramp 0 → 1
+audio.fade_out(1000)      # ms — linear ramp 1 → 0
+audio.speed(1.5)          # 1.5× faster, pitch preserved
+audio.reverse()           # reverse in time
+audio.normalize()         # peak-normalize (optional headroom_db)
+audio.remove_silence()    # drop gaps > min_silence_ms below threshold_db
 ```
+
+### As Built
+
+- All six are immutable `Audio` methods that delegate to pure-function modules in
+  `aiaudio/effects/` (`fade.py`, `normalize.py`, `silence.py`, `timestretch.py`),
+  keeping `audio.py` lean. Each handles mono and stereo.
+- `speed()` uses **overlap-add time stretching** (windowed analysis frames
+  re-timed at a different synthesis hop) — tempo changes while **pitch is
+  preserved**, with no resampling and no extra dependencies. Output length ≈
+  `len(input) / factor`.
+- `normalize(headroom_db=0.0)` scales the peak to `-headroom_db` dBFS; silent
+  input is returned unchanged.
+- `remove_silence(threshold_db=-40, min_silence_ms=100)` removes only silent
+  runs longer than `min_silence_ms`, so natural short pauses survive.
+- CLI parity: `aiaudio fade | normalize | reverse | speed | silence`.
 
 ### Technology Stack
 
 | Package | Purpose |
 |---------|---------|
-| `numpy` | Array operations |
+| `numpy` | Array operations, windowing, overlap-add |
 | `scipy.signal` | Signal processing |
 
 ---
